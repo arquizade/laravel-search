@@ -1,101 +1,54 @@
 #!/bin/bash
-
-# Laravel Docker Installation Script
-# This script sets up the Laravel application with Docker
-
 set -e
 
-echo "🚀 Starting Laravel Docker Installation..."
-echo ""
+echo "🚀 Installing..."
 
-# Check if Docker is running
-if ! docker info > /dev/null 2>&1; then
-    echo "❌ Error: Docker is not running. Please start Docker and try again."
-    exit 1
-fi
-
-echo "✅ Docker is running"
-echo ""
-
-# Check if .env file exists
+# 1. Environment Setup
 if [ ! -f .env ]; then
-    echo "📝 Creating .env file from .env.example..."
     cp .env.example .env
-    echo "✅ .env file created"
-else
-    echo "✅ .env file already exists"
+    echo "✅ Created .env file"
 fi
 
-# Set default environment variables if not set
-if ! grep -q "WWWUSER" .env; then
-    echo "⚙️  Adding WWWUSER and WWWGROUP to .env..."
-    echo "" >> .env
-    echo "WWWUSER=1000" >> .env
-    echo "WWWGROUP=1000" >> .env
-    echo "✅ Environment variables added"
-fi
+# 2. Install dependencies
+echo "📦 Running initial Composer install via helper container..."
+docker run --rm \
+    -u "$(id -u):$(id -g)" \
+    -v "$(pwd):/var/www/html" \
+    -w /var/www/html \
+    laravelsail/php83-composer:latest \
+    composer install --ignore-platform-reqs
 
-if ! grep -q "APP_PORT" .env; then
-    echo "⚙️  Adding APP_PORT to .env..."
-    sed -i 's|APP_URL=.*|APP_URL=http://localhost:8085|' .env
-    echo "APP_PORT=8085" >> .env
-    echo "✅ APP_PORT configured"
-fi
-
-echo ""
-echo "🐳 Building Docker containers..."
-./vendor/bin/sail build --no-cache
-
-echo ""
-echo "🚢 Starting Docker containers..."
+# 3. Start Sail
+echo "🐳 Starting Laravel Sail..."
 ./vendor/bin/sail up -d
 
-echo ""
-echo "⏳ Waiting for MySQL and Meilisearch to be ready..."
-sleep 15
-
-echo ""
-echo "🔑 Generating application key..."
+# 4. Finalize Configuration
+echo "🔑 Generating App Key..."
 ./vendor/bin/sail artisan key:generate
 
-echo ""
-echo "📦 Installing Composer dependencies..."
-./vendor/bin/sail composer install
-
-echo ""
-echo "🔍 Installing Laravel Scout and Meilisearch..."
-./vendor/bin/sail composer require laravel/scout meilisearch/meilisearch-php
-
-echo ""
-echo "📝 Publishing Scout configuration..."
-./vendor/bin/sail artisan vendor:publish --provider="Laravel\Scout\ScoutServiceProvider"
-
-echo ""
-echo "📦 Installing NPM dependencies..."
-./vendor/bin/sail npm install
-
-echo ""
-echo "🗄️  Running database migrations..."
+echo "🗄️ Running Migrations..."
+# Wait for MySQL to be ready
+until ./vendor/bin/sail artisan db:monitor > /dev/null 2>&1; do
+  echo "⏳ Waiting for MySQL..."
+  sleep 5
+done
 ./vendor/bin/sail artisan migrate
 
-echo ""
-echo "🎨 Building frontend assets..."
+echo "🎨 Building Frontend..."
+./vendor/bin/sail npm install
 ./vendor/bin/sail npm run build
 
 echo ""
 echo "✨ Installation complete!"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🎉 Your Laravel application is ready!"
+echo "🎉 Application is ready"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "📱 Access your application:"
 echo "   🌐 Application: http://localhost:8085"
 echo "   🎨 Tailwind Demo: http://localhost:8085/kitchensink"
 echo "   🔍 Meilisearch: http://localhost:7700"
-echo ""
-echo "🔍 Meilisearch Connection:"
-echo "   Host: http://localhost:7700"
 echo ""
 echo "💻 Useful Commands:"
 echo "   Start containers:  ./start.sh"
