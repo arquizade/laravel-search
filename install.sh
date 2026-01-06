@@ -61,4 +61,3 @@ echo "🔥 Start development server (Hot Reload):"
 echo "   ./vendor/bin/sail npm run dev"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
